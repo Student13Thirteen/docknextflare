@@ -1,9 +1,12 @@
 # -----------------------------------------------------------------------------
 # NEXTCLOUD + MARIADB + CLOUDFLARE TUNNEL
-# Optimized setup for a secure private cloud without exposing any router ports.
+# Secure private cloud stack — no exposed router ports required.
+# -----------------------------------------------------------------------------
+# Setup: copy .env.example to .env and fill in your credentials before running.
 # -----------------------------------------------------------------------------
 
 services:
+
   db:
     image: mariadb:10.11
     container_name: nextcloud-db
@@ -14,9 +17,8 @@ services:
     networks:
       - private-net
     environment:
-      # CHANGE THESE PASSWORDS BEFORE DEPLOYMENT
-      - MYSQL_ROOT_PASSWORD=your_secure_root_password_here
-      - MYSQL_PASSWORD=your_secure_db_password_here
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=nextcloud
 
@@ -33,8 +35,7 @@ services:
     networks:
       - private-net
     environment:
-      # THESE CREDENTIALS MUST MATCH THE DB SETTINGS ABOVE
-      - MYSQL_PASSWORD=your_secure_db_password_here
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=nextcloud
       - MYSQL_HOST=db
@@ -47,8 +48,9 @@ services:
       - app
     networks:
       - private-net
-    # REPLACE 'your_cloudflare_token_here' WITH YOUR ACTUAL CLOUDFLARE TOKEN
-    command: tunnel --no-autoupdate run --token your_cloudflare_token_here
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+    command: tunnel --config /etc/cloudflared/config.yml run --token ${CLOUDFLARE_TOKEN}
 
 networks:
   private-net:
