@@ -133,7 +133,7 @@ This service is actively monitored using a self-hosted **Uptime Kuma** instance.
 It performs health checks every 5 minutes and sends real-time push notifications via a Telegram Bot in case of downtime. 
 
 For more details on the monitoring infrastructure and setup, check out my dedicated repository:
-👉 **[Homelab Monitoring with Uptime Kuma]([(https://github.com/Student13Thirteen/uptimemonitoring)])**
+👉 **[Homelab Monitoring with Uptime Kuma](https://github.com/Student13Thirteen/uptimemonitoring)**
 
 ## 📝 License
 
