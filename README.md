@@ -1,140 +1,131 @@
-# ☁️ DockNextFlare: Secure Private Cloud
+# DockNextFlare — Secure Private Cloud Architecture
 
-A complete, production-ready Docker stack to deploy a self-hosted **Nextcloud** instance powered by **MariaDB**, securely exposed to the internet through a **Cloudflare Zero Trust Tunnel** (`cloudflared`).
+Self-hosted private cloud stack built with **Nextcloud**, **MariaDB**, **Docker Compose** and **Cloudflare Tunnel**.  
+The goal is to provide secure remote access to a private document cloud without exposing inbound router ports.
 
-## ✨ Why this stack?
+> Portfolio focus: Linux administration, Docker Compose, secure tunneling, private cloud deployment, backup thinking and operational documentation.
 
-Traditional self-hosted clouds require opening ports on your router, managing dynamic IPs, and manually renewing SSL certificates. This stack eliminates all of that:
+## What this project demonstrates
 
-- **Zero Exposed Ports:** Your router stays completely locked down.
-- **Built-in SSL & DDoS Protection:** Cloudflare handles HTTPS and security at the edge.
-- **Stable Remote Access:** The tunnel is configured with keepalive settings to prevent SSH and connection drops.
-- **Portability:** The entire infrastructure is defined in a single `docker-compose.yml`. Migrate to a new server in minutes.
+- Linux-based service deployment with Docker Compose
+- Nextcloud + MariaDB container orchestration
+- Cloudflare Zero Trust Tunnel for outbound-only remote access
+- Environment-based configuration using `.env`
+- Operational runbook, troubleshooting and security documentation
+- Backup and restore procedure awareness
 
-## 🏗️ Architecture
+## Architecture
 
+```text
+User Browser
+    │
+    ▼
+Cloudflare Edge / Zero Trust
+    │ encrypted outbound tunnel
+    ▼
+cloudflared container
+    │ Docker bridge network
+    ▼
+Nextcloud app container
+    │
+    ▼
+MariaDB container
 ```
-Internet → Cloudflare Edge → cloudflared (tunnel) → nextcloud-app:80 → nextcloud-db
-                                                         (private-net bridge — no ports exposed)
-```
 
-1. **Nextcloud (App):** The core cloud platform, reachable internally on port `8080`.
-2. **MariaDB (Database):** A dedicated, optimized database container.
-3. **Cloudflared (Tunnel):** Outbound-only encrypted tunnel to Cloudflare's edge — no inbound firewall rules needed.
-4. **Private Network:** All containers communicate through an isolated Docker bridge network (`private-net`).
+No public host port is required for production usage. Cloudflare Tunnel reaches the Nextcloud container over the private Docker network.
 
-## 📁 Repository Structure
+## Repository structure
 
-```
+```text
 docknextflare/
-├── docker-compose.yml
 ├── cloudflared/
-│   └── config.yml          # Tunnel keepalive settings
-├── .env.example            # Template — copy to .env and fill in your values
+│   └── config.yml
+├── docs/
+│   ├── architecture.md
+│   ├── backup-restore.md
+│   ├── deployment.md
+│   ├── runbook.md
+│   ├── security.md
+│   ├── troubleshooting.md
+│   └── screenshots/
+├── .env.example
 ├── .gitignore
+├── CHANGELOG.md
+├── docker-compose.yml
+├── LICENSE
 └── README.md
 ```
 
-## 🚀 Quick Start Guide
+## Quick start
 
-### Prerequisites
-
-- Docker and Docker Compose installed
-- A domain name managed via Cloudflare
-- A Cloudflare Zero Trust account (free tier is enough)
-
-### Installation
-
-**1. Clone the repository:**
 ```bash
 git clone https://github.com/Student13Thirteen/docknextflare.git
 cd docknextflare
-```
-
-**2. Create your environment file:**
-```bash
 cp .env.example .env
 nano .env
-```
-Fill in your own secure passwords. Never commit this file.
-
-**3. Set up the Cloudflare Tunnel:**
-- Go to Cloudflare Zero Trust Dashboard → Networks → Tunnels
-- Create a new tunnel and route it to `http://nextcloud-app:80`
-- Copy your tunnel **token** and your tunnel **ID**
-- Paste the token into `.env`:
-  ```env
-  CLOUDFLARE_TOKEN=your_token_here
-  ```
-- Paste the tunnel ID into `cloudflared/config.yml`:
-  ```yaml
-  tunnel: your-tunnel-id-here
-  ```
-
-**4. Deploy the stack:**
-```bash
 docker compose up -d
 ```
 
-**5. First Setup:**
+Then configure your Cloudflare Zero Trust tunnel to route your public hostname to:
 
-Navigate to your public domain (e.g., `https://cloud.yourdomain.com`). Nextcloud will prompt you to create an admin account and configure the database. Use these values:
+```text
+http://nextcloud-app:80
+```
+
+## First Nextcloud setup
+
+When opening the public URL for the first time, use these database settings:
 
 | Field | Value |
 |---|---|
 | Database user | `nextcloud` |
-| Database password | the `MYSQL_PASSWORD` from your `.env` |
+| Database password | `MYSQL_PASSWORD` from `.env` |
 | Database name | `nextcloud` |
 | Database host | `db` |
 
-## 🛡️ Security Notes
+## Documentation
 
-- **Never commit `.env`** — it's in `.gitignore` by default.
-- Use strong, unique passwords for both `MYSQL_ROOT_PASSWORD` and `MYSQL_PASSWORD`.
-- The Cloudflare tunnel token grants access to your tunnel — treat it like a private key.
-- After first setup, configure `'overwrite.cli.url'` and `'overwriteprotocol' => 'https'` in Nextcloud's `config/config.php` to avoid mixed-content errors behind Cloudflare.
+| Document | Purpose |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | System design and container flow |
+| [`docs/deployment.md`](docs/deployment.md) | Step-by-step deployment procedure |
+| [`docs/runbook.md`](docs/runbook.md) | Daily operations and useful checks |
+| [`docs/troubleshooting.md`](docs/troubleshooting.md) | Common issues and fixes |
+| [`docs/security.md`](docs/security.md) | Security boundaries and hardening notes |
+| [`docs/backup-restore.md`](docs/backup-restore.md) | Backup and restore procedure |
 
-## 🔧 Useful Commands
+## Useful commands
 
 ```bash
-# View live logs
+# Check running containers
+docker compose ps
+
+# View logs
 docker compose logs -f
 
-# Restart a single container
-docker restart nextcloud-app
+# Restart the application
+docker compose restart app
+
+# Enter the Nextcloud container
+docker exec -it nextcloud-app bash
 
 # Run Nextcloud occ commands
-docker exec --user www-data nextcloud-app php occ <command>
-
-# Update all images
-docker compose pull && docker compose up -d
+docker exec --user www-data nextcloud-app php occ status
 ```
 
-## 💾 Backup
+## Security notes
 
-Never copy the `database/` folder directly — always use a proper dump:
+- Never commit `.env`, tunnel tokens, database dumps or runtime folders.
+- Prefer no host port exposure in production; use Cloudflare Tunnel only.
+- Use strong unique passwords for MariaDB.
+- Enable MFA on the Cloudflare account.
+- Keep Docker images updated and backup before upgrades.
 
-```bash
-# Stop Nextcloud (keep DB running)
-docker stop nextcloud-app
+## Related project
 
-# Dump the database
-docker exec nextcloud-db mysqldump -u nextcloud -p"${MYSQL_PASSWORD}" nextcloud > backup_$(date +%Y%m%d).sql
+This service can be monitored using my Uptime Kuma monitoring setup:  
+[uptimemonitoring](https://github.com/Student13Thirteen/uptimemonitoring)
 
-# Archive Nextcloud files
-tar -czf backup_html_$(date +%Y%m%d).tar.gz ./html
+## License
 
-# Restart
-docker start nextcloud-app
-```
-
-## 📈 Monitoring & Alerts
-This service is actively monitored using a self-hosted **Uptime Kuma** instance. 
-It performs health checks every 5 minutes and sends real-time push notifications via a Telegram Bot in case of downtime. 
-
-For more details on the monitoring infrastructure and setup, check out my dedicated repository:
-👉 **[Homelab Monitoring with Uptime Kuma](https://github.com/Student13Thirteen/uptimemonitoring)**
-
-## 📝 License
-
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT — see [`LICENSE`](LICENSE).

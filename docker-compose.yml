@@ -1,12 +1,11 @@
 # -----------------------------------------------------------------------------
 # NEXTCLOUD + MARIADB + CLOUDFLARE TUNNEL
-# Secure private cloud stack — no exposed router ports required.
+# Secure private cloud stack — production setup with no public host ports.
 # -----------------------------------------------------------------------------
 # Setup: copy .env.example to .env and fill in your credentials before running.
 # -----------------------------------------------------------------------------
 
 services:
-
   db:
     image: mariadb:10.11
     container_name: nextcloud-db
@@ -25,9 +24,7 @@ services:
   app:
     image: nextcloud:latest
     container_name: nextcloud-app
-    restart: always
-    ports:
-      - 8080:80
+    restart: unless-stopped
     depends_on:
       - db
     volumes:
@@ -39,17 +36,22 @@ services:
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=nextcloud
       - MYSQL_HOST=db
+    # Production note:
+    # No host port is exposed. Cloudflared reaches http://nextcloud-app:80
+    # through the private Docker network. For local-only debug, temporarily use:
+    # ports:
+    #   - "127.0.0.1:8080:80"
 
   tunnel:
-    container_name: cloudflared-tunnel
     image: cloudflare/cloudflared:latest
-    restart: always
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
     depends_on:
       - app
     networks:
       - private-net
     volumes:
-      - ./cloudflared:/etc/cloudflared
+      - ./cloudflared:/etc/cloudflared:ro
     command: tunnel --config /etc/cloudflared/config.yml run --token ${CLOUDFLARE_TOKEN}
 
 networks:
