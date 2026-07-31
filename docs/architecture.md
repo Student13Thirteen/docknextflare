@@ -1,36 +1,73 @@
-# Architecture — DockNextFlare
+# Architecture
 
-## Goal
+## Objective
 
-Deploy a private cloud service with secure remote access and minimal network exposure.
+Make a private Nextcloud instance available from any device while keeping the host free of public application and database ports.
 
 ## Components
 
-| Component | Role |
+| Component | Responsibility |
 |---|---|
-| Nextcloud | File sharing and private cloud application |
-| MariaDB | Persistent relational database for Nextcloud |
-| cloudflared | Outbound Cloudflare Zero Trust tunnel |
-| Docker bridge network | Isolated container-to-container communication |
-| `.env` | Local secret/configuration file not committed to Git |
+| `cloudflared` | establishes the outbound tunnel to Cloudflare |
+| Nextcloud Apache image | web application, file API and initial auto-configuration |
+| MariaDB LTS image | persistent relational data |
+| `docknextflare` command | setup, health checks, backups and controlled updates |
+| `.env` | local configuration and credentials; never committed |
 
-## Request flow
-
-```text
-User → Cloudflare Edge → Cloudflare Tunnel → cloudflared → nextcloud-app:80 → db:3306
-```
-
-The tunnel is outbound-only from the server to Cloudflare. No inbound router port forwarding is required.
-
-## Data persistence
+## Network separation
 
 ```text
-./html      → Nextcloud application and user data
-./database  → MariaDB data directory
+Internet
+   |
+Cloudflare edge
+   |
+cloudflared
+   |
+[edge network]
+   |
+Nextcloud
+   |
+[backend network: internal]
+   |
+MariaDB
 ```
 
-Both directories are runtime data and must not be committed to Git.
+Only Nextcloud joins both networks. MariaDB joins only the internal backend network, and neither service publishes a host port.
 
-## Portfolio value
+## Request path
 
-This project demonstrates a practical private-cloud architecture using containerized services, DNS/tunnel configuration, operational documentation and a security-first deployment approach.
+```text
+browser
+  -> HTTPS to Cloudflare
+  -> existing outbound Tunnel connection
+  -> cloudflared container
+  -> http://app:80 over Docker DNS
+  -> Nextcloud
+  -> MariaDB only when application data is needed
+```
+
+## Persistence
+
+```text
+data/nextcloud -> /var/www/html
+data/mariadb   -> /var/lib/mysql
+```
+
+The directories are easy to locate and include in an operator-controlled backup. Container recreation does not delete them.
+
+## Startup behavior
+
+1. MariaDB initializes and must pass its health check.
+2. Nextcloud starts with the official image's database and administrator variables.
+3. Nextcloud becomes healthy only after `status.php` reports an installed instance.
+4. The tunnel starts after Nextcloud is healthy.
+
+This ordering avoids exposing a half-installed application and reduces first-boot race conditions.
+
+## Trust boundaries
+
+- Cloudflare is trusted to terminate public HTTPS and route the request.
+- The tunnel token is sufficient to run the tunnel and is therefore secret.
+- Nextcloud remains responsible for users, sessions, sharing and application permissions.
+- MariaDB is reachable only from the internal application network.
+- The host operator remains responsible for patches, backups and incident response.
