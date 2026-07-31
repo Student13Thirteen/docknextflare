@@ -1,10 +1,27 @@
-# Secrets — never commit these
+# Local secrets and generated configuration
 .env
+.env.backup.*
 
-# Nextcloud and database data
-html/
-database/
+# Persistent runtime data
+data/
 
-# Mac/Windows junk
+# Backups and database dumps
+backups/
+*.sql
+*.tar
+*.tar.gz
+*.zip
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Local Cloudflare credentials / legacy tunnel configuration
+cloudflared/*.json
+cloudflared/*.pem
+
+# OS and editor files
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/

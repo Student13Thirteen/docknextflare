@@ -1,38 +1,61 @@
-# Backup & Restore — DockNextFlare
+# Backup and restore
 
-## Backup principle
-
-Back up both:
-
-1. MariaDB database dump
-2. Nextcloud data/application directory
-
-## Manual backup
+## Create a backup
 
 ```bash
-mkdir -p backups
-
-# Optional: enable maintenance mode
-docker exec --user www-data nextcloud-app php occ maintenance:mode --on
-
-# Dump database
-docker exec nextcloud-db sh -c 'mysqldump -u nextcloud -p"$MYSQL_PASSWORD" nextcloud' > backups/nextcloud_db_$(date +%Y%m%d_%H%M).sql
-
-# Archive Nextcloud files
-tar -czf backups/nextcloud_html_$(date +%Y%m%d_%H%M).tar.gz html
-
-# Disable maintenance mode
-docker exec --user www-data nextcloud-app php occ maintenance:mode --off
+bash docknextflare backup
 ```
+
+The command:
+
+1. enables Nextcloud maintenance mode;
+2. writes a logical MariaDB dump;
+3. archives the complete Nextcloud directory;
+4. writes SHA-256 checksums when a checksum utility is available;
+5. disables maintenance mode even if an intermediate step fails.
+
+Output is stored under:
+
+```text
+backups/YYYYMMDD_HHMMSS/
+|- nextcloud.sql
+|- nextcloud-files.tar.gz
+`- SHA256SUMS
+```
+
+A backup on the same disk protects against some operator mistakes, not against disk loss, theft or server compromise. Copy selected backups to a separate trusted destination.
 
 ## Restore outline
 
-1. Stop application containers.
-2. Restore `html/` archive.
-3. Restore database dump into MariaDB.
-4. Start containers.
-5. Run Nextcloud maintenance/repair checks.
+A restore is intentionally not automated because it is destructive and should be reviewed case by case.
 
-## Notes
+1. Stop the stack:
 
-Test restore procedures before relying on backups in production.
+   ```bash
+   bash docknextflare stop
+   ```
+
+2. Preserve the current `data/` directory before replacing anything.
+3. Restore `nextcloud-files.tar.gz` so that `data/nextcloud` is recreated.
+4. Start only MariaDB and wait for it:
+
+   ```bash
+   docker compose up -d db
+   ```
+
+5. Import the SQL dump:
+
+   ```bash
+   set -a; source .env; set +a
+   docker compose exec -T db mariadb -u nextcloud "-p$MYSQL_PASSWORD" nextcloud < backups/TIMESTAMP/nextcloud.sql
+   ```
+
+6. Start the complete stack and repair if required:
+
+   ```bash
+   bash docknextflare start
+   docker compose exec -T -u www-data app php occ maintenance:repair
+   bash docknextflare doctor
+   ```
+
+Test the procedure on non-critical data before relying on it.

@@ -1,72 +1,62 @@
-# Deployment Guide — DockNextFlare
+# Deployment
 
-## 1. Server prerequisites
+## Prerequisites
 
-```bash
-docker --version
-docker compose version
-```
+- Linux host with Docker Engine and Docker Compose v2;
+- a domain managed by Cloudflare;
+- a remotely-managed Cloudflare Tunnel;
+- a public hostname route targeting `http://app:80`.
 
-Recommended server baseline:
+No router port forwarding is required.
 
-- Linux host, preferably Ubuntu Server
-- Docker + Docker Compose plugin
-- Domain managed through Cloudflare
-- Cloudflare Zero Trust tunnel
-
-## 2. Environment setup
+## Guided deployment
 
 ```bash
-cp .env.example .env
-nano .env
+git clone https://github.com/Student13Thirteen/docknextflare.git
+cd docknextflare
+bash docknextflare setup
 ```
 
-Set strong values for:
+The command asks for the hostname, tunnel token and administrator username. It then generates all passwords, writes `.env`, creates persistent directories, validates Compose, pulls images and starts the stack.
 
-```env
-MYSQL_ROOT_PASSWORD=
-MYSQL_PASSWORD=
-CLOUDFLARE_TOKEN=
-```
+## Cloudflare dashboard step
 
-## 3. Cloudflare tunnel route
-
-In Cloudflare Zero Trust, create a tunnel and route the desired hostname to:
+For the selected Tunnel, create a Public Hostname:
 
 ```text
-http://nextcloud-app:80
+Hostname: cloud.example.com
+Type:     HTTP
+URL:      app:80
 ```
 
-## 4. Start services
+The `app` hostname is resolved by Docker inside the shared `edge` network. Do not point Cloudflare at a host port because the Compose file deliberately publishes none.
+
+## Verify
 
 ```bash
-docker compose up -d
-docker compose ps
+bash docknextflare status
+bash docknextflare doctor
 ```
 
-## 5. First application setup
-
-Open the public hostname and configure Nextcloud with:
+Then open:
 
 ```text
-Database user: nextcloud
-Database password: MYSQL_PASSWORD from .env
-Database name: nextcloud
-Database host: db
+https://cloud.example.com
 ```
 
-## 6. Post-deployment checks
+The initial login can be displayed locally with:
 
 ```bash
-docker compose logs --tail=100 app
-docker compose logs --tail=100 db
-docker compose logs --tail=100 tunnel
-docker exec --user www-data nextcloud-app php occ status
+bash docknextflare credentials
 ```
 
-## 7. Suggested next steps
+## Existing installations
 
-- Configure Nextcloud trusted domains.
-- Verify HTTPS redirect behavior behind Cloudflare.
-- Configure Uptime Kuma monitoring.
-- Configure periodic backups.
+The automatic administrator and database variables affect initial installation. They do not re-create or overwrite an existing database under `data/`.
+
+Before moving an existing installation into this layout:
+
+1. back up the database and Nextcloud directory;
+2. preserve the existing `config.php` and data directory;
+3. adapt paths deliberately rather than running a fresh setup over them;
+4. test the migration on a copy.
