@@ -1,0 +1,39 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: bash -n docknextflare
+
+      - name: ShellCheck
+        run: shellcheck docknextflare
+
+      - name: Validate Compose model
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+
+      - name: Confirm no host ports are published
+        run: |
+          if docker compose config | grep -Eq '^[[:space:]]+ports:'; then
+            echo 'Host ports must remain unpublished.' >&2
+            exit 1
+          fi
+
+      - name: Confirm secrets and runtime data are ignored
+        run: |
+          git check-ignore -q .env
+          git check-ignore -q data/example
+          git check-ignore -q backups/example
