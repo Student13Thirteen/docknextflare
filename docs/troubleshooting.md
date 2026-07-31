@@ -1,62 +1,79 @@
-# Troubleshooting — DockNextFlare
+# Troubleshooting
 
-## Public URL does not load
-
-Check tunnel logs:
+Start with:
 
 ```bash
-docker compose logs -f tunnel
+bash docknextflare doctor
 ```
 
-Verify in Cloudflare Zero Trust:
+## Public hostname does not load
+
+```bash
+bash docknextflare logs tunnel
+```
+
+Verify the Cloudflare Public Hostname service is exactly:
 
 ```text
-Public hostname → Service → http://nextcloud-app:80
+http://app:80
 ```
 
-## Nextcloud shows database connection error
+Also confirm the tunnel token belongs to the selected tunnel and the DNS hostname is active in Cloudflare.
+
+## Tunnel is connected but Nextcloud is unavailable
 
 ```bash
-docker compose ps
-docker compose logs --tail=100 db
-docker compose logs --tail=100 app
+bash docknextflare status
+bash docknextflare logs app
 ```
 
-Check `.env` values and ensure the database host is `db` during first setup.
+The tunnel starts only after the application health check passes. A tunnel container that is not created yet may simply mean Nextcloud is still installing or unhealthy.
 
-## Mixed content or wrong protocol warning
-
-Behind Cloudflare, Nextcloud may need overwrite settings in `config/config.php`:
-
-```php
-'overwriteprotocol' => 'https',
-'overwrite.cli.url' => 'https://cloud.your-domain.com',
-```
-
-## Container keeps restarting
+## Database health check fails
 
 ```bash
-docker inspect nextcloud-app --format '{{.State.ExitCode}}'
-docker compose logs --tail=200 app
+bash docknextflare logs db
 ```
 
 Common causes:
 
-- wrong environment variables
-- database not ready
-- permission issues in mounted volume
-- broken Nextcloud config
+- insufficient disk space;
+- wrong ownership or permissions under `data/mariadb`;
+- an interrupted first initialization;
+- reusing an incompatible existing database directory.
+
+Do not delete database files to “try again” unless a verified backup exists.
+
+## Nextcloud redirects to HTTP or the wrong hostname
+
+Confirm `.env` contains only the hostname:
+
+```env
+NEXTCLOUD_HOSTNAME=cloud.example.com
+```
+
+Do not include `https://` or a path. For a previously installed instance, environment variables do not necessarily remove older values already written to `config.php`; inspect the active configuration with:
+
+```bash
+docker compose exec -T -u www-data app php occ config:list system
+```
+
+## Permission errors in persistent directories
+
+```bash
+ls -ld data data/nextcloud data/mariadb
+bash docknextflare logs app
+bash docknextflare logs db
+```
+
+Avoid recursively changing ownership without first identifying which container and UID created the files.
 
 ## Disk full
 
 ```bash
 df -h
-du -sh html database
-```
-
-Clean unused Docker resources only after checking what is safe:
-
-```bash
+du -sh data/nextcloud data/mariadb backups
 docker system df
-docker image prune
 ```
+
+Remove old backups or unused Docker images only after confirming they are not the sole recovery copy.
