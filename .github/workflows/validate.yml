@@ -4,21 +4,25 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  static-checks:
-    runs-on: ubuntu-latest
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - name: Shell syntax
-        run: bash -n docknextflare
+      - name: Check Bash syntax
+        run: |
+          bash -n docknextflare
+          bash -n scripts/ci_smoke.sh
 
-      - name: ShellCheck
-        run: shellcheck docknextflare
+      - name: Run ShellCheck
+        run: shellcheck --severity=warning docknextflare scripts/ci_smoke.sh
 
       - name: Validate Compose model
         run: |
@@ -37,3 +41,7 @@ jobs:
           git check-ignore -q .env
           git check-ignore -q data/example
           git check-ignore -q backups/example
+          rm .env
+
+      - name: Smoke-test Nextcloud and MariaDB from a clean workspace
+        run: bash scripts/ci_smoke.sh
